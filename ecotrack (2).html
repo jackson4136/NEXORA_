@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoTrack — Smart Waste Reporting Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+/* ============================= TOKENS ============================= */
+:root{
+  --bg-0:#070a10;
+  --bg-1:#0c1119;
+  --panel:#0f1622;
+  --panel-2:#111a28;
+  --line:#1c2836;
+  --text:#e7f1ff;
+  --text-dim:#8ba0b8;
+  --text-faint:#5b6d82;
+  --accent:#00f0d8;
+  --accent-2:#ff2fb0;
+  --ok:#39ff88;
+  --warn:#ffce39;
+  --danger:#ff3b5c;
+  --empty:#3a4a5c;
+  --radius:10px;
+  --shadow-glow: 0 0 0 1px rgba(0,240,216,.15), 0 0 24px -6px rgba(0,240,216,.35);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:
+    radial-gradient(1100px 600px at 15% -10%, rgba(0,240,216,.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,47,176,.07), transparent 55%),
+    var(--bg-0);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+}
+h1,h2,h3,h4{font-family:'Rajdhani',sans-serif; margin:0; font-weight:700; letter-spacing:.2px;}
+p{margin:0;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;}
+::selection{background:var(--accent);color:#00201c;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:var(--bg-1);}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px;}
+.mono{font-family:'Space Mono',monospace;}
+
+/* ============================= UTILITY STRIP ============================= */
+.utility-bar{
+  background:var(--bg-1);
+  border-bottom:1px solid var(--line);
+  font-size:12px;
+  color:var(--text-faint);
+}
+.utility-bar .wrap{display:flex;justify-content:space-between;align-items:center;height:34px;}
+.utility-bar .u-links{display:flex;gap:18px;}
+.utility-bar .u-links span{cursor:default;}
+.utility-bar .u-links span:hover{color:var(--accent);}
+.utility-tricolor{height:3px;width:100%;background:linear-gradient(90deg,#ff9933 0 33%, var(--accent) 33% 66%, #128a4b 66% 100%); opacity:.55;}
+
+/* ============================= HEADER ============================= */
+header.site{
+  position:sticky;top:0;z-index:200;
+  background:rgba(9,13,20,.86);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.header-row{display:flex;align-items:center;justify-content:space-between;height:76px;gap:20px;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand .mark{width:42px;height:42px;flex:none;}
+.brand-text h1{font-size:22px;color:var(--text);letter-spacing:.5px;}
+.brand-text h1 span{color:var(--accent);}
+.brand-text small{display:block;font-size:11px;color:var(--text-faint);letter-spacing:.6px;margin-top:1px;}
+
+nav.main-nav{display:flex;align-items:center;gap:4px;}
+nav.main-nav a{
+  padding:9px 16px;border-radius:7px;font-size:14.5px;color:var(--text-dim);
+  font-weight:500; transition:color .15s, background .15s;
+  position:relative;
+}
+nav.main-nav a:hover{color:var(--text);background:var(--panel);}
+nav.main-nav a.active{color:var(--accent);}
+nav.main-nav a.active::after{
+  content:"";position:absolute;left:16px;right:16px;bottom:3px;height:2px;background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+}
+.nav-cta{display:flex;align-items:center;gap:10px;}
+.icon-btn{
+  width:40px;height:40px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+  display:flex;align-items:center;justify-content:center;color:var(--text-dim);
+  transition:border-color .15s,color .15s;
+}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn{
+  border:1px solid var(--line); background:var(--panel); color:var(--text);
+  padding:10px 18px; border-radius:8px; font-size:14px; font-weight:600;
+  display:inline-flex; align-items:center; gap:8px; transition:all .15s;
+}
+.btn:hover{border-color:var(--accent);}
+.btn.primary{
+  background:linear-gradient(135deg, var(--accent), #00b8ff); color:#00201c; border:none;
+  box-shadow:0 0 0 1px rgba(0,240,216,.2), 0 8px 24px -8px rgba(0,240,216,.55);
+}
+.btn.primary:hover{filter:brightness(1.08);}
+.btn.ghost{background:transparent;}
+.btn.small{padding:7px 12px;font-size:12.5px;}
+.hamburger{display:none;}
+
+/* ============================= SECTIONS GENERIC ============================= */
+main{display:block;}
+section{padding:64px 0;}
+section.tight{padding:36px 0;}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;gap:16px;flex-wrap:wrap;}
+.section-head h2{font-size:28px;}
+.section-head .sub{color:var(--text-dim);font-size:14.5px;margin-top:6px;max-width:520px;}
+.tag{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--accent);
+  border:1px solid rgba(0,240,216,.35); background:rgba(0,240,216,.06);
+  padding:5px 10px;border-radius:20px;margin-bottom:10px;
+}
+.tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);}
+
+/* ============================= HERO ============================= */
+.hero{padding:56px 0 20px;}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;}
+.hero h2{font-size:44px;line-height:1.08;color:var(--text);}
+.hero h2 em{font-style:normal;color:var(--accent);}
+.hero p.lead{color:var(--text-dim);font-size:16px;line-height:1.6;margin-top:16px;max-width:480px;}
+.hero-actions{display:flex;gap:12px;margin-top:26px;}
+.hero-visual{position:relative;}
+.hero-ring{
+  aspect-ratio:1/1;border-radius:50%;
+  border:1px dashed rgba(0,240,216,.3);
+  display:flex;align-items:center;justify-content:center;position:relative;
+}
+.hero-ring::before{
+  content:"";position:absolute;inset:14%;border-radius:50%;border:1px solid rgba(255,47,176,.25);
+}
+.hero-live{
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px;
+  width:78%;text-align:center;box-shadow:var(--shadow-glow);
+}
+.hero-live .big{font-family:'Rajdhani';font-size:52px;font-weight:700;color:var(--accent);text-shadow:0 0 18px rgba(0,240,216,.5);}
+.hero-live .lbl{color:var(--text-dim);font-size:13px;margin-top:4px;letter-spacing:.4px;}
+.hero-live .split{display:flex;justify-content:space-around;margin-top:18px;border-top:1px solid var(--line);padding-top:16px;}
+.hero-live .split div span{display:block;font-family:'Rajdhani';font-weight:700;font-size:20px;}
+.hero-live .split div small{color:var(--text-faint);font-size:11px;}
+.c-full{color:var(--danger);} .c-half{color:var(--ok);} .c-empty{color:var(--empty);}
+
+/* ============================= STAT CARDS ============================= */
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:44px;}
+.stat-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 16px;transition:border-color .2s, transform .2s;
+}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.stat-card .icn{width:26px;height:26px;color:var(--accent);margin-bottom:12px;}
+.stat-card .val{font-family:'Rajdhani';font-size:26px;font-weight:700;}
+.stat-card .lbl{color:var(--text-dim);font-size:12.5px;margin-top:2px;}
+
+/* ============================= CHART TOGGLE / PANEL ============================= */
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;
+}
+.chart-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;}
+.chart-toolbar h3{font-size:18px;}
+.chart-icons{display:flex;gap:8px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px;padding:4px;}
+.chart-icons button{
+  width:42px;height:36px;border:none;background:transparent;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;color:var(--text-dim);
+}
+.chart-icons button svg{width:19px;height:19px;}
+.chart-icons button.active{background:var(--accent);color:#00201c;box-shadow:0 0 14px rgba(0,240,216,.5);}
+.chart-canvas-wrap{height:300px;position:relative;}
+.legend-row{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap;font-size:12.5px;color:var(--text-dim);}
+.legend-row .lg{display:flex;align-items:center;gap:7px;}
+.legend-row .sw{width:10px;height:10px;border-radius:3px;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+
+/* ============================= MAP ============================= */
+.map-section .panel{padding:0;overflow:hidden;}
+.map-topbar{
+  display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.map-topbar select, .map-topbar input{
+  background:var(--bg-1);border:1px solid var(--line);color:var(--text);border-radius:7px;
+  padding:9px 12px;font-size:13.5px;
+}
+.map-topbar select:focus, .map-topbar input:focus{outline:1px solid var(--accent);}
+.map-topbar .spacer{flex:1;}
+#map-canvas{height:520px;width:100%;background:#0a0f16;}
+.map-legend{
+  position:absolute;bottom:16px;left:16px;z-index:400;background:rgba(10,15,22,.9);
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;backdrop-filter:blur(6px);
+}
+.map-legend .lg{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.map-legend .lg:first-child{margin-top:0;}
+.map-wrap{position:relative;}
+.map-wrap .float-controls{position:absolute;top:14px;right:14px;z-index:400;display:flex;flex-direction:column;gap:8px;}
+.map-wrap .float-controls button{
+  width:38px;height:38px;border-radius:8px;background:rgba(10,15,22,.9);border:1px solid var(--line);
+  color:var(--text-dim);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);
+}
+.map-wrap .float-controls button:hover{color:var(--accent);border-color:var(--accent);}
+.gmap-toggle{display:flex;background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px;}
+.gmap-toggle button{
+  border:none;background:transparent;color:var(--text-dim);padding:8px 13px;border-radius:6px;font-size:12.5px;font-weight:600;
+  display:flex;align-items:center;gap:6px;
+}
+.gmap-toggle button.active{background:var(--accent);color:#00201c;}
+.gmap-toggle button svg{width:14px;height:14px;}
+#gmapFrame{
+  width:100%;height:520px;border:0;display:none;background:#0a0f16;
+}
+#gmapFrame.show{display:block;}
+#map-canvas.hide{display:none;}
+.gmap-open-link{
+  display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:12.5px;font-weight:600;margin-top:2px;
+}
+.gmap-open-link:hover{text-decoration:underline;}
+.pulse-dot{position:relative;}
+.pulse-dot::after{
+  content:"";position:absolute;inset:-6px;border-radius:50%;
+  animation:pulse 1.6s ease-out infinite;
+}
+.pulse-full::after{background:rgba(255,59,92,.55);}
+.pulse-half::after{background:rgba(57,255,136,.5);}
+@keyframes pulse{0%{transform:scale(.4);opacity:.9;}100%{transform:scale(2.2);opacity:0;}}
+
+/* ============================= REPORTS ============================= */
+.report-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:20px;}
+.form-row{margin-bottom:16px;}
+.form-row label{display:block;font-size:12.5px;color:var(--text-dim);margin-bottom:7px;}
+.form-row select, .form-row input, .form-row textarea{
+  width:100%;background:var(--bg-1);border:1px solid var(--line);color:var(--text);
+  border-radius:8px;padding:11px 13px;font-size:14px;font-family:inherit;
+}
+.form-row select:focus, .form-row input:focus, .form-row textarea:focus{outline:1px solid var(--accent);}
+.form-row textarea{resize:vertical;min-height:88px;}
+.report-list{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto;padding-right:4px;}
+.report-item{border:1px solid var(--line);border-radius:9px;padding:14px;background:var(--bg-1);}
+.report-item .row1{display:flex;justify-content:space-between;font-size:13.5px;font-weight:600;}
+.report-item p{color:var(--text-dim);font-size:12.5px;margin-top:6px;}
+.status-pill{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;}
+.pill-open{background:rgba(255,59,92,.15);color:var(--danger);}
+.pill-progress{background:rgba(255,206,57,.15);color:var(--warn);}
+.pill-resolved{background:rgba(57,255,136,.15);color:var(--ok);}
+
+/* ============================= ACCOUNT / LOGIN ============================= */
+.account-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px;margin:0 auto;}
+.login-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:30px;}
+.login-card h3{font-size:19px;margin-bottom:4px;}
+.login-card .sub{color:var(--text-dim);font-size:13px;margin-bottom:20px;}
+.login-card.admin{border-color:rgba(255,47,176,.35);box-shadow:0 0 0 1px rgba(255,47,176,.08);}
+.login-card.admin h3{color:var(--accent-2);}
+.msg{font-size:12.5px;margin-top:12px;padding:10px 12px;border-radius:8px;display:none;}
+.msg.err{display:block;background:rgba(255,59,92,.1);color:var(--danger);border:1px solid rgba(255,59,92,.3);}
+.msg.ok{display:block;background:rgba(57,255,136,.1);color:var(--ok);border:1px solid rgba(57,255,136,.3);}
+
+/* ============================= ADMIN DASHBOARD ============================= */
+#admin-dash{display:none;}
+.admin-topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+.admin-badge{
+  display:inline-flex;align-items:center;gap:8px;background:rgba(255,47,176,.1);
+  border:1px solid rgba(255,47,176,.35);color:var(--accent-2);padding:6px 12px;border-radius:20px;font-size:12.5px;
+}
+table.admin-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+table.admin-table th{
+  text-align:left;color:var(--text-faint);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;
+  padding:10px 12px;border-bottom:1px solid var(--line);
+}
+table.admin-table td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--text-dim);}
+table.admin-table tr:hover td{background:var(--bg-1);color:var(--text);}
+.badge-status{padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
+.b-full{background:rgba(255,59,92,.15);color:var(--danger);}
+.b-half{background:rgba(57,255,136,.15);color:var(--ok);}
+.b-empty{background:rgba(122,140,160,.15);color:var(--text-dim);}
+.theme-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.swatch{
+  width:34px;height:34px;border-radius:9px;border:2px solid transparent;cursor:pointer;position:relative;
+}
+.swatch.active{border-color:#fff;}
+.admin-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:20px;margin-bottom:22px;}
+
+/* ============================= FOOTER ============================= */
+footer{border-top:1px solid var(--line);padding:44px 0 26px;margin-top:40px;background:var(--bg-1);}
+.footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px;}
+.footer-grid h4{font-size:13px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;}
+.footer-grid a{display:block;color:var(--text-faint);font-size:13.5px;margin-bottom:9px;}
+.footer-grid a:hover{color:var(--accent);}
+.foot-brand{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.foot-brand .mark{width:30px;height:30px;}
+.foot-brand span{font-family:'Rajdhani';font-weight:700;font-size:18px;}
+.foot-brand span em{font-style:normal;color:var(--accent);}
+footer p.copy{color:var(--text-faint);font-size:12.5px;margin-top:8px;max-width:340px;line-height:1.6;}
+.foot-bottom{
+  border-top:1px solid var(--line);margin-top:34px;padding-top:20px;display:flex;justify-content:space-between;
+  color:var(--text-faint);font-size:12px;flex-wrap:wrap;gap:10px;
+}
+
+/* ============================= TOAST ============================= */
+#toast{
+  position:fixed;bottom:22px;right:22px;z-index:999;background:var(--panel);border:1px solid var(--accent);
+  color:var(--text);padding:13px 18px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow-glow);
+  display:none;align-items:center;gap:10px;
+}
+#toast.show{display:flex;}
+#toast .d{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);}
+
+.hidden-view{display:none !important;}
+
+/* ============================= RESPONSIVE ============================= */
+@media (max-width:980px){
+  .hero-grid{grid-template-columns:1fr;}
+  .stat-strip{grid-template-columns:repeat(3,1fr);}
+  .two-col, .report-grid, .account-grid, .admin-grid{grid-template-columns:1fr;}
+  .footer-grid{grid-template-columns:1fr 1fr;}
+}
+@media (max-width:760px){
+  nav.main-nav{
+    position:fixed;top:0;right:0;height:100vh;width:250px;background:var(--bg-1);border-left:1px solid var(--line);
+    flex-direction:column;align-items:flex-start;padding:80px 20px;transform:translateX(100%);transition:transform .25s;z-index:150;
+  }
+  nav.main-nav.open{transform:translateX(0);}
+  .hamburger{display:flex;}
+  .stat-strip{grid-template-columns:repeat(2,1fr);}
+  .hero h2{font-size:32px;}
+  .footer-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================= UTILITY STRIP ============================= -->
+<div class="utility-bar">
+  <div class="wrap">
+    <div class="u-links">
+      <span>Skip to main content</span>
+      <span>Screen reader access</span>
+      <span>हिंदी | English</span>
+    </div>
+    <div class="u-links">
+      <span id="clock" class="mono"></span>
+    </div>
+  </div>
+</div>
+<div class="utility-tricolor"></div>
+
+<!-- ============================= HEADER ============================= -->
+<header class="site">
+  <div class="wrap header-row">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="22" stroke="url(#g1)" stroke-width="2"/>
+        <path d="M24 12c6 4 9 9 9 14a9 9 0 1 1-18 0c0-5 3-10 9-14Z" stroke="var(--accent)" stroke-width="2" fill="rgba(0,240,216,.08)"/>
+        <path d="M24 20v12M18 26h12" stroke="var(--accent-2)" stroke-width="1.6" stroke-linecap="round"/>
+        <defs><linearGradient id="g1" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#00f0d8"/><stop offset="1" stop-color="#ff2fb0"/></linearGradient></defs>
+      </svg>
+      <div class="brand-text">
+        <h1>Eco<span>Track</span></h1>
+        <small>SMART WASTE REPORTING NETWORK · CIVIC INFRASTRUCTURE</small>
+      </div>
+    </div>
+
+    <nav class="main-nav" id="mainNav">
+      <a href="#home" class="nav-link active" data-view="home">Home</a>
+      <a href="#livemap" class="nav-link" data-view="home">Live Map</a>
+      <a href="#reports" class="nav-link" data-view="reports">Reports</a>
+      <a href="#account" class="nav-link" data-view="account">Account</a>
+      <a href="#account" class="nav-link" data-view="account" id="adminNavLink">Admin</a>
+    </nav>
+
+    <div class="nav-cta">
+      <button class="icon-btn" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      </button>
+      <a href="#account" class="icon-btn nav-link" data-view="account" title="Account">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
+      </a>
+      <button class="hamburger icon-btn" id="hamburgerBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ============================= HOME VIEW ============================= -->
+<div id="view-home" class="view">
+
+  <section class="hero" id="home">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="tag"><span class="dot"></span> Live network · updates every 60s</div>
+        <h2>Every dustbin, <em>tracked live</em> across the city.</h2>
+        <p class="lead">EcoTrack maps municipal waste bins in real time, flags overflow before it becomes a problem, and gives citizens a direct line to report issues on the ground.</p>
+        <div class="hero-actions">
+          <a href="#livemap" class="btn primary nav-link" data-view="home">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/></svg>
+            Open live map
+          </a>
+          <a href="#reports" class="btn ghost nav-link" data-view="reports">Report an issue</a>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-ring">
+          <div class="hero-live">
+            <div class="big" id="heroTotal">0</div>
+            <div class="lbl">BINS MONITORED CITYWIDE</div>
+            <div class="split">
+              <div><span class="c-full" id="heroFull">0</span><small>FULL</small></div>
+              <div><span class="c-half" id="heroHalf">0</span><small>HALF</small></div>
+              <div><span class="c-empty" id="heroEmpty">0</span><small>EMPTY</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap stat-strip">
+      <div class="stat-card">
+        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="9" width="4" height="11"/><rect x="10" y="5" width="4" height="15"/><rect x="17" y="12" width="4" height="8"/></svg>
+        <div class="val" id="statAreas">0</div><div class="lbl">Areas covered</div>
+      </div>
+      <div class="stat-card">
+        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg>
+        <div class="val" id="statLastSync">now</div><div class="lbl">Last synced</div>
+      </div>
+      <div class="stat-card">
+        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <div class="val" id="statBins">0</div><div class="lbl">Total dustbins</div>
+      </div>
+      <div class="stat-card">
+        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 18a1.7 1.7 0 0 0 1.5 2.5h16a1.7 1.7 0 0 0 1.5-2.5L13.7 3.9a1.7 1.7 0 0 0-3.4 0Z"/></svg>
+        <div class="val" id="statFull">0</div><div class="lbl">Needs pickup now</div>
+      </div>
+      <div class="stat-card">
+        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0Z"/><path d="M4 21l3-3"/></svg>
+        <div class="val" id="statReports">0</div><div class="lbl">Open reports</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tight">
+    <div class="wrap panel">
+      <div class="chart-toolbar">
+        <div>
+          <h3>Bin status overview</h3>
+          <p class="sub" style="margin-top:4px;">Choose how you'd like to view the citywide distribution.</p>
+        </div>
+        <div class="chart-icons">
+          <button class="chart-icon-btn active" data-chart="pie" title="Pie chart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.2 15a9 9 0 1 1-9.2-9.2v9.2Z"/><path d="M13 3.3V13h9.7A9 9 0 0 0 13 3.3Z"/></svg>
+          </button>
+          <button class="chart-icon-btn" data-chart="bar" title="Bar chart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="10" width="4" height="10"/><rect x="10" y="5" width="4" height="15"/><rect x="17" y="13" width="4" height="7"/></svg>
+          </button>
+          <button class="chart-icon-btn" data-chart="line" title="Line chart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-6 4 3 8-9"/><path d="M3 20h18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="mainChart"></canvas></div>
+      <div class="legend-row">
+        <div class="lg"><span class="sw" style="background:var(--danger)"></span> Full — needs pickup</div>
+        <div class="lg"><span class="sw" style="background:var(--ok)"></span> Half full</div>
+        <div class="lg"><span class="sw" style="background:var(--empty)"></span> Empty</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tight map-section" id="map-section">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <h2 id="livemap">Live bin map</h2>
+          <p class="sub">Every marker is a real dustbin with its own ID. Colour shows fill level — click one for details.</p>
+        </div>
+        <div class="tag"><span class="dot"></span> <span id="mapSyncLabel">synced just now</span></div>
+      </div>
+      <div class="panel">
+        <div class="map-topbar">
+          <select id="areaSelect"><option value="">Jump to area…</option></select>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option value="full">Full only</option>
+            <option value="half">Half only</option>
+            <option value="empty">Empty only</option>
+          </select>
+          <div class="spacer"></div>
+          <div class="gmap-toggle">
+            <button id="viewLiveBtn" class="active" data-view="live">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/></svg>
+              Live network map
+            </button>
+            <button id="viewGoogleBtn" data-view="google">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 1 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Google Maps
+            </button>
+          </div>
+          <button class="btn small ghost" id="refreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v6h-6"/></svg>
+            Refresh now
+          </button>
+        </div>
+        <div class="map-wrap">
+          <div id="map-canvas"></div>
+          <iframe id="gmapFrame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="float-controls">
+            <button id="locateBtn" title="My location">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+            </button>
+            <button id="tileToggleBtn" title="Toggle map style">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15M15 6v15"/></svg>
+            </button>
+            <button id="fullscreenBtn" title="Fullscreen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+            </button>
+          </div>
+          <div class="map-legend">
+            <div class="lg"><span class="sw" style="background:var(--danger)"></span> Full</div>
+            <div class="lg"><span class="sw" style="background:var(--ok)"></span> Half</div>
+            <div class="lg"><span class="sw" style="background:var(--empty)"></span> Empty</div>
+          </div>
+        </div>
+        <div style="padding:14px 20px;border-top:1px solid var(--line);">
+          <a id="gmapOpenLink" class="gmap-open-link" href="https://www.google.com/maps/@18.5204,73.8567,12z" target="_blank" rel="noopener">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+            Open this area in Google Maps ↗
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================= REPORTS VIEW ============================= -->
+<div id="view-reports" class="view hidden-view">
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <h2>Reports</h2>
+          <p class="sub">Flag a bin that needs attention, and see what's already been reported nearby.</p>
+        </div>
+      </div>
+      <div class="report-grid">
+        <div class="panel">
+          <h3 style="margin-bottom:18px;">Report a dustbin</h3>
+          <form id="reportForm">
+            <div class="form-row">
+              <label>Area</label>
+              <select id="rArea" required></select>
+            </div>
+            <div class="form-row">
+              <label>Dustbin ID</label>
+              <select id="rBin" required></select>
+            </div>
+            <div class="form-row">
+              <label>Issue type</label>
+              <select id="rType">
+                <option>Overflowing</option>
+                <option>Damaged bin</option>
+                <option>Missing bin</option>
+                <option>Bad odour / not collected</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Description</label>
+              <textarea id="rDesc" placeholder="Add any detail that helps the collection team…"></textarea>
+            </div>
+            <button class="btn primary" type="submit" style="width:100%;justify-content:center;">Submit report</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h3 style="margin-bottom:16px;">Recent reports</h3>
+          <div class="report-list" id="reportList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tight">
+    <div class="wrap">
+      <div class="section-head">
+        <div><h2>Annual report</h2><p class="sub">Waste volume collected over the past 12 months across the network.</p></div>
+      </div>
+      <div class="panel">
+        <div class="chart-canvas-wrap" style="height:280px;"><canvas id="annualChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================= ACCOUNT VIEW ============================= -->
+<div id="view-account" class="view hidden-view">
+  <section>
+    <div class="wrap">
+      <div class="section-head"><div><h2>Account</h2><p class="sub">Sign in as a citizen to track your reports, or as an administrator to manage the network.</p></div></div>
+
+      <div class="account-grid" id="loginArea">
+        <div class="login-card">
+          <h3>Citizen login</h3>
+          <p class="sub">Track the reports you've submitted and follow their progress.</p>
+          <form id="citizenForm">
+            <div class="form-row"><label>Name</label><input type="text" required placeholder="Your name"></div>
+            <div class="form-row"><label>Email</label><input type="email" required placeholder="you@example.com"></div>
+            <div class="form-row"><label>Password</label><input type="password" required placeholder="••••••••"></div>
+            <button class="btn primary" style="width:100%;justify-content:center;" type="submit">Sign in</button>
+          </form>
+          <div class="msg ok" id="citizenMsg">Signed in — welcome back!</div>
+        </div>
+
+        <div class="login-card admin">
+          <h3>Administrator login</h3>
+          <p class="sub">Restricted access. Network-wide data and controls for authorised staff only.</p>
+          <form id="adminForm">
+            <div class="form-row"><label>Admin ID</label><input type="text" id="adminUser" required placeholder="Admin username"></div>
+            <div class="form-row"><label>Access key</label><input type="password" id="adminPass" required placeholder="••••••••••••"></div>
+            <button class="btn" style="width:100%;justify-content:center;border-color:var(--accent-2);color:var(--accent-2);" type="submit">Access dashboard</button>
+          </form>
+          <div class="msg err" id="adminMsg">Incorrect ID or access key.</div>
+        </div>
+      </div>
+
+      <!-- ============================= ADMIN DASHBOARD ============================= -->
+      <div id="admin-dash">
+        <div class="admin-topbar">
+          <div>
+            <div class="admin-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 6v6c0 5 4 8.5 9 10 5-1.5 9-5 9-10V6l-9-4Z"/></svg>
+              Administrator session
+            </div>
+            <h2 style="margin-top:12px;">Network control centre</h2>
+          </div>
+          <button class="btn small ghost" id="logoutBtn">Log out</button>
+        </div>
+
+        <div class="admin-grid">
+          <div class="panel">
+            <h3 style="margin-bottom:16px;">All dustbins</h3>
+            <div style="max-height:360px;overflow:auto;">
+              <table class="admin-table">
+                <thead><tr><th>Bin ID</th><th>Area</th><th>Status</th><th>Fill</th><th>Updated</th></tr></thead>
+                <tbody id="adminTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3 style="margin-bottom:14px;">Theme customisation</h3>
+            <p class="sub" style="margin-bottom:6px;">Accent colour</p>
+            <div class="theme-row" id="themeSwatches"></div>
+            <p class="sub" style="margin:18px 0 6px;">Data refresh interval</p>
+            <select id="refreshInterval" style="width:100%;background:var(--bg-1);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px;">
+              <option value="60000">Every 1 minute</option>
+              <option value="30000">Every 30 seconds</option>
+              <option value="300000">Every 5 minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 style="margin-bottom:16px;">Past 12 months — collection volume</h3>
+          <div class="chart-canvas-wrap" style="height:260px;"><canvas id="adminAnnualChart"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+</main>
+
+<!-- ============================= FOOTER ============================= -->
+<footer>
+  <div class="wrap footer-grid">
+    <div>
+      <div class="foot-brand">
+        <svg class="mark" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="var(--accent)" stroke-width="2"/><path d="M24 12c6 4 9 9 9 14a9 9 0 1 1-18 0c0-5 3-10 9-14Z" stroke="var(--accent)" stroke-width="2" fill="rgba(0,240,216,.08)"/></svg>
+        <span>Eco<em>Track</em></span>
+      </div>
+      <p class="copy">A civic smart-waste monitoring platform. Live bin data, citizen reporting and municipal oversight in one network.</p>
+    </div>
+    <div>
+      <h4>Platform</h4>
+      <a href="#home" class="nav-link" data-view="home">Home</a>
+      <a href="#livemap" class="nav-link" data-view="home">Live map</a>
+      <a href="#reports" class="nav-link" data-view="reports">Reports</a>
+    </div>
+    <div>
+      <h4>Access</h4>
+      <a href="#account" class="nav-link" data-view="account">Citizen login</a>
+      <a href="#account" class="nav-link" data-view="account">Admin login</a>
+    </div>
+    <div>
+      <h4>Network status</h4>
+      <a>API — <span style="color:var(--ok);">online</span></a>
+      <a>Map sync — <span style="color:var(--ok);">active</span></a>
+      <a>Last deploy — v1.0</a>
+    </div>
+  </div>
+  <div class="wrap foot-bottom">
+    <span>© <span id="year"></span> EcoTrack. Municipal Smart City Initiative.</span>
+    <span>Built for a cleaner, tracked city.</span>
+  </div>
+</footer>
+
+<div id="toast"><span class="d"></span><span id="toastText">Data synced</span></div>
+
+<script>
+/* ============================================================
+   DATA MODEL
+   ============================================================ */
+const AREAS = [
+  {id:'A1', name:'Kothrud',        lat:18.5074, lng:73.8077, bins:8},
+  {id:'A2', name:'Shivajinagar',   lat:18.5308, lng:73.8478, bins:6},
+  {id:'A3', name:'Hinjewadi',      lat:18.5912, lng:73.7389, bins:10},
+  {id:'A4', name:'Viman Nagar',    lat:18.5679, lng:73.9143, bins:7},
+  {id:'A5', name:'Camp',           lat:18.5158, lng:73.8788, bins:5},
+  {id:'A6', name:'Baner',          lat:18.5590, lng:73.7868, bins:9},
+  {id:'A7', name:'Kharadi',        lat:18.5515, lng:73.9430, bins:6},
+  {id:'A8', name:'Aundh',          lat:18.5643, lng:73.8077, bins:7},
+];
+
+const STATUS_COLORS = { full:'#ff3b5c', half:'#39ff88', empty:'#3a4a5c' };
+let bins = [];
+let markers = [];
+let map, tileDark, tileSat, usingSat = false;
+let reports = [];
+
+function jitter(v, amt){ return v + (Math.random()-0.5)*amt; }
+function pad(n){ return n.toString().padStart(2,'0'); }
+function weightedStatus(){
+  const r = Math.random();
+  if(r < 0.28) return 'full';
+  if(r < 0.62) return 'half';
+  return 'empty';
+}
+function fillForStatus(s){
+  if(s==='full') return Math.round(85 + Math.random()*15);
+  if(s==='half') return Math.round(35 + Math.random()*40);
+  return Math.round(Math.random()*15);
+}
+
+function buildBins(){
+  bins = [];
+  AREAS.forEach(area=>{
+    for(let i=1;i<=area.bins;i++){
+      const status = weightedStatus();
+      bins.push({
+        id: `${area.id}-${pad(i)}`,
+        area: area.name,
+        areaId: area.id,
+        lat: jitter(area.lat, 0.012),
+        lng: jitter(area.lng, 0.012),
+        status,
+        fill: fillForStatus(status),
+        updated: new Date()
+      });
+    }
+  });
+}
+buildBins();
+
+/* ============================================================
+   CLOCK
+   ============================================================ */
+function tickClock(){
+  document.getElementById('clock').textContent = new Date().toLocaleString('en-IN', {
+    weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+}
+tickClock(); setInterval(tickClock, 1000);
+document.getElementById('year').textContent = new Date().getFullYear();
+
+/* ============================================================
+   NAVIGATION (single page views)
+   ============================================================ */
+function setActiveNav(view){
+  document.querySelectorAll('.nav-link[data-view]').forEach(a=>{
+    a.classList.toggle('active', a.dataset.view===view && a.closest('nav'));
+  });
+}
+function showView(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden-view'));
+  document.getElementById('view-'+view).classList.remove('hidden-view');
+  setActiveNav(view);
+  document.getElementById('mainNav').classList.remove('open');
+  if(view==='home') setTimeout(()=>{ if(map) map.invalidateSize(); }, 60);
+}
+document.querySelectorAll('.nav-link[data-view]').forEach(a=>{
+  a.addEventListener('click', (e)=>{
+    showView(a.dataset.view);
+  });
+});
+document.getElementById('hamburgerBtn').addEventListener('click', ()=>{
+  document.getElementById('mainNav').classList.toggle('open');
+});
+
+/* ============================================================
+   MAP
+   ============================================================ */
+function initMap(){
+  map = L.map('map-canvas', { zoomControl:true, attributionControl:false }).setView([18.5204,73.8567], 12);
+  tileDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  tileSat = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19});
+
+  const div = document.getElementById('map-canvas');
+  const wrap = div.parentElement;
+  const legend = wrap.querySelector('.map-legend');
+
+  renderMarkers();
+}
+
+function binIcon(bin){
+  const color = STATUS_COLORS[bin.status];
+  const pulseClass = bin.status==='full' ? 'pulse-dot pulse-full' : (bin.status==='half' ? 'pulse-dot pulse-half' : '');
+  const fillStyle = bin.status==='empty' ? `background:transparent;border:2px solid ${color};` : `background:${color};border:2px solid rgba(255,255,255,.5);`;
+  return L.divIcon({
+    className:'',
+    html:`<div class="${pulseClass}" style="width:14px;height:14px;border-radius:50%;${fillStyle};box-shadow:0 0 8px ${bin.status!=='empty'?color:'transparent'};"></div>`,
+    iconSize:[14,14], iconAnchor:[7,7]
+  });
+}
+
+function renderMarkers(filterStatus){
+  markers.forEach(m=>map.removeLayer(m));
+  markers = [];
+  bins.forEach(bin=>{
+    if(filterStatus && bin.status!==filterStatus) return;
+    const m = L.marker([bin.lat,bin.lng], {icon:binIcon(bin)}).addTo(map);
+    m.bindPopup(`
+      <div style="font-family:Inter,sans-serif;min-width:190px;">
+        <div style="font-family:Rajdhani;font-weight:700;font-size:15px;color:#0c1119;">${bin.id}</div>
+        <div style="font-size:12.5px;color:#4a5a6c;margin:2px 0 8px;">${bin.area}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;">
+          <span>Status</span><strong style="text-transform:capitalize;color:${STATUS_COLORS[bin.status]==='#39ff88'?'#0a8a44':STATUS_COLORS[bin.status]}">${bin.status}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;">
+          <span>Fill level</span><strong>${bin.fill}%</strong>
+        </div>
+        <div style="font-size:11.5px;color:#7a8ba0;margin-top:6px;">Updated ${timeAgo(bin.updated)}</div>
+        <a href="https://www.google.com/maps?q=${bin.lat},${bin.lng}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11.5px;font-weight:600;color:#00a896;">
+          Open in Google Maps ↗
+        </a>
+      </div>
+    `);
+    markers.push(m);
+  });
+}
+
+function timeAgo(date){
+  const s = Math.floor((new Date()-date)/1000);
+  if(s<10) return 'just now';
+  if(s<60) return s+'s ago';
+  const m = Math.floor(s/60);
+  if(m<60) return m+'m ago';
+  return Math.floor(m/60)+'h ago';
+}
+
+/* Map controls */
+document.getElementById('locateBtn').addEventListener('click', ()=>{
+  if(!navigator.geolocation){ showToast('Location not supported on this device'); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    map.flyTo([pos.coords.latitude,pos.coords.longitude], 15);
+    showToast('Centred on your location');
+  }, ()=> showToast('Location access denied'));
+});
+document.getElementById('tileToggleBtn').addEventListener('click', ()=>{
+  if(usingSat){ map.removeLayer(tileSat); map.addLayer(tileDark); } else { map.removeLayer(tileDark); map.addLayer(tileSat); }
+  usingSat = !usingSat;
+});
+document.getElementById('fullscreenBtn').addEventListener('click', ()=>{
+  const el = document.getElementById('map-canvas');
+  if(!document.fullscreenElement){ el.requestFullscreen?.(); } else { document.exitFullscreen?.(); }
+  setTimeout(()=>map.invalidateSize(), 200);
+});
+document.getElementById('refreshBtn').addEventListener('click', ()=>{ simulateUpdate(); showToast('Map refreshed'); });
+document.getElementById('statusFilter').addEventListener('change', (e)=> renderMarkers(e.target.value||null));
+document.getElementById('areaSelect').addEventListener('change', (e)=>{
+  const area = AREAS.find(a=>a.id===e.target.value);
+  if(area){
+    map.flyTo([area.lat,area.lng], 14.5);
+    setGoogleView(area.lat, area.lng, 14);
+  } else {
+    setGoogleView(18.5204, 73.8567, 12);
+  }
+});
+
+/* ---- Google Maps embed (no API key needed) + view toggle ---- */
+function setGoogleView(lat, lng, zoom){
+  const frame = document.getElementById('gmapFrame');
+  frame.src = `https://maps.google.com/maps?q=${lat},${lng}&z=${zoom}&output=embed`;
+  document.getElementById('gmapOpenLink').href = `https://www.google.com/maps/@${lat},${lng},${zoom}z`;
+}
+function switchMapView(view){
+  const canvas = document.getElementById('map-canvas');
+  const frame = document.getElementById('gmapFrame');
+  document.getElementById('viewLiveBtn').classList.toggle('active', view==='live');
+  document.getElementById('viewGoogleBtn').classList.toggle('active', view==='google');
+  if(view==='google'){
+    canvas.classList.add('hide');
+    frame.classList.add('show');
+    if(!frame.src) setGoogleView(18.5204, 73.8567, 12);
+  } else {
+    canvas.classList.remove('hide');
+    frame.classList.remove('show');
+    setTimeout(()=> map && map.invalidateSize(), 60);
+  }
+}
+document.getElementById('viewLiveBtn').addEventListener('click', ()=> switchMapView('live'));
+document.getElementById('viewGoogleBtn').addEventListener('click', ()=> switchMapView('google'));
+
+/* populate area select + report form selects */
+function populateAreaSelects(){
+  const sel = document.getElementById('areaSelect');
+  const rArea = document.getElementById('rArea');
+  AREAS.forEach(a=>{
+    sel.insertAdjacentHTML('beforeend', `<option value="${a.id}">${a.name}</option>`);
+    rArea.insertAdjacentHTML('beforeend', `<option value="${a.id}">${a.name}</option>`);
+  });
+  populateBinSelect(AREAS[0].id);
+}
+function populateBinSelect(areaId){
+  const rBin = document.getElementById('rBin');
+  rBin.innerHTML = '';
+  bins.filter(b=>b.areaId===areaId).forEach(b=>{
+    rBin.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.id} — ${b.status}</option>`);
+  });
+}
+document.getElementById('rArea')?.addEventListener('change', e=> populateBinSelect(e.target.value));
+
+/* ============================================================
+   STATS + HERO
+   ============================================================ */
+function refreshStats(){
+  const total = bins.length;
+  const full = bins.filter(b=>b.status==='full').length;
+  const half = bins.filter(b=>b.status==='half').length;
+  const empty = bins.filter(b=>b.status==='empty').length;
+
+  document.getElementById('heroTotal').textContent = total;
+  document.getElementById('heroFull').textContent = full;
+  document.getElementById('heroHalf').textContent = half;
+  document.getElementById('heroEmpty').textContent = empty;
+
+  document.getElementById('statAreas').textContent = AREAS.length;
+  document.getElementById('statBins').textContent = total;
+  document.getElementById('statFull').textContent = full;
+  document.getElementById('statReports').textContent = reports.filter(r=>r.status!=='Resolved').length;
+  document.getElementById('statLastSync').textContent = 'now';
+}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+let mainChart, annualChart, adminAnnualChart;
+const MONTHS = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'];
+const ANNUAL_DATA = MONTHS.map(()=> Math.round(2200 + Math.random()*1400));
+
+function statusCounts(){
+  return {
+    full: bins.filter(b=>b.status==='full').length,
+    half: bins.filter(b=>b.status==='half').length,
+    empty: bins.filter(b=>b.status==='empty').length,
+  };
+}
+function areaBinCounts(){
+  return { labels: AREAS.map(a=>a.name), data: AREAS.map(a=> bins.filter(b=>b.areaId===a.id).length) };
+}
+
+function accentColor(){
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00f0d8';
+}
+
+function renderMainChart(type){
+  const ctx = document.getElementById('mainChart');
+  if(mainChart) mainChart.destroy();
+  const commonOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:'#8ba0b8', font:{family:'Inter'} } } },
+    scales: type==='pie' ? {} : {
+      x:{ ticks:{ color:'#5b6d82' }, grid:{ color:'rgba(255,255,255,.04)' } },
+      y:{ ticks:{ color:'#5b6d82' }, grid:{ color:'rgba(255,255,255,.06)' } }
+    }
+  };
+  if(type==='pie'){
+    const c = statusCounts();
+    mainChart = new Chart(ctx, { type:'pie', data:{ labels:['Full','Half','Empty'], datasets:[{ data:[c.full,c.half,c.empty], backgroundColor:[STATUS_COLORS.full,STATUS_COLORS.half,'#4a5a6c'], borderColor:'#0f1622', borderWidth:2 }] }, options: commonOpts });
+  } else if(type==='bar'){
+    const a = areaBinCounts();
+    mainChart = new Chart(ctx, { type:'bar', data:{ labels:a.labels, datasets:[{ label:'Bins per area', data:a.data, backgroundColor: accentColor(), borderRadius:5 }] }, options: commonOpts });
+  } else {
+    mainChart = new Chart(ctx, { type:'line', data:{ labels:MONTHS, datasets:[{ label:'Bins reported full (network)', data: MONTHS.map(()=>Math.round(20+Math.random()*40)), borderColor: accentColor(), backgroundColor:'rgba(0,240,216,.12)', fill:true, tension:.35, pointRadius:3 }] }, options: commonOpts });
+  }
+}
+document.querySelectorAll('.chart-icon-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.chart-icon-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderMainChart(btn.dataset.chart);
+  });
+});
+
+function renderAnnualCharts(){
+  ['annualChart','adminAnnualChart'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const inst = new Chart(el, {
+      type:'line',
+      data:{ labels:MONTHS, datasets:[{ label:'Waste collected (kg)', data:ANNUAL_DATA, borderColor:'#ff2fb0', backgroundColor:'rgba(255,47,176,.12)', fill:true, tension:.35, pointRadius:3 }] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ color:'#8ba0b8' } } },
+        scales:{ x:{ ticks:{color:'#5b6d82'}, grid:{color:'rgba(255,255,255,.04)'} }, y:{ ticks:{color:'#5b6d82'}, grid:{color:'rgba(255,255,255,.06)'} } } }
+    });
+    if(id==='annualChart') annualChart = inst; else adminAnnualChart = inst;
+  });
+}
+
+/* ============================================================
+   REPORTS
+   ============================================================ */
+function renderReportList(){
+  const list = document.getElementById('reportList');
+  if(reports.length===0){ list.innerHTML = `<p class="sub">No reports yet — be the first to flag something.</p>`; return; }
+  list.innerHTML = reports.slice().reverse().map(r=>`
+    <div class="report-item">
+      <div class="row1"><span>${r.bin} · ${r.area}</span><span class="status-pill ${r.status==='Open'?'pill-open':(r.status==='In progress'?'pill-progress':'pill-resolved')}">${r.status}</span></div>
+      <p>${r.type} — ${r.desc || 'No additional details.'}</p>
+      <p style="margin-top:4px;color:var(--text-faint);">${timeAgo(r.time)}</p>
+    </div>
+  `).join('');
+}
+document.getElementById('reportForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const areaSel = document.getElementById('rArea');
+  const area = AREAS.find(a=>a.id===areaSel.value)?.name || areaSel.value;
+  reports.push({
+    bin: document.getElementById('rBin').value,
+    area,
+    type: document.getElementById('rType').value,
+    desc: document.getElementById('rDesc').value,
+    status:'Open', time:new Date()
+  });
+  document.getElementById('rDesc').value='';
+  renderReportList(); refreshStats();
+  showToast('Report submitted — thank you');
+});
+
+/* ============================================================
+   LOGIN — CITIZEN + ADMIN
+   ============================================================ */
+document.getElementById('citizenForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const msg = document.getElementById('citizenMsg');
+  msg.className='msg ok'; msg.textContent='Signed in — welcome back!';
+});
+
+const ADMIN_KEY = 'Admin_@#123';
+document.getElementById('adminForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const pass = document.getElementById('adminPass').value;
+  const msg = document.getElementById('adminMsg');
+  if(pass === ADMIN_KEY){
+    msg.className='msg ok'; msg.textContent='Access granted. Loading dashboard…';
+    document.getElementById('loginArea').style.display='none';
+    document.getElementById('admin-dash').style.display='block';
+    renderAdminTable();
+  } else {
+    msg.className='msg err'; msg.textContent='Incorrect ID or access key. Admin access is restricted.';
+  }
+});
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  document.getElementById('admin-dash').style.display='none';
+  document.getElementById('loginArea').style.display='grid';
+  document.getElementById('adminPass').value='';
+});
+
+function renderAdminTable(){
+  const body = document.getElementById('adminTableBody');
+  body.innerHTML = bins.map(b=>`
+    <tr>
+      <td class="mono">${b.id}</td>
+      <td>${b.area}</td>
+      <td><span class="badge-status ${b.status==='full'?'b-full':(b.status==='half'?'b-half':'b-empty')}">${b.status}</span></td>
+      <td>${b.fill}%</td>
+      <td>${timeAgo(b.updated)}</td>
+    </tr>
+  `).join('');
+}
+
+/* ============================================================
+   THEME CUSTOMISATION
+   ============================================================ */
+const THEMES = [
+  {name:'Cyan / Magenta', a:'#00f0d8', b:'#ff2fb0'},
+  {name:'Violet / Lime',  a:'#8b5cf6', b:'#c6ff3a'},
+  {name:'Amber / Cyan',   a:'#ffb020', b:'#00d0ff'},
+  {name:'Rose / Teal',    a:'#ff5c8a', b:'#14e0b4'},
+];
+function renderThemeSwatches(){
+  const row = document.getElementById('themeSwatches');
+  row.innerHTML = THEMES.map((t,i)=>`<button class="swatch" data-i="${i}" style="background:linear-gradient(135deg,${t.a},${t.b})" title="${t.name}"></button>`).join('');
+  row.querySelectorAll('.swatch').forEach(sw=>{
+    sw.addEventListener('click', ()=>{
+      const t = THEMES[sw.dataset.i];
+      document.documentElement.style.setProperty('--accent', t.a);
+      document.documentElement.style.setProperty('--accent-2', t.b);
+      row.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+      sw.classList.add('active');
+      localStorage.setItem('ecotrack-theme', sw.dataset.i);
+      renderMainChart(document.querySelector('.chart-icon-btn.active').dataset.chart);
+      showToast('Theme updated: '+t.name);
+    });
+  });
+  const saved = localStorage.getItem('ecotrack-theme');
+  if(saved!==null && THEMES[saved]){
+    row.children[saved].click();
+  }
+}
+
+/* ============================================================
+   LIVE AUTO-UPDATE (simulated, every 60s by default)
+   ============================================================ */
+let updateTimer;
+function simulateUpdate(){
+  const changeCount = Math.max(2, Math.round(bins.length*0.08));
+  for(let i=0;i<changeCount;i++){
+    const b = bins[Math.floor(Math.random()*bins.length)];
+    b.status = weightedStatus();
+    b.fill = fillForStatus(b.status);
+    b.updated = new Date();
+  }
+  renderMarkers(document.getElementById('statusFilter').value || null);
+  refreshStats();
+  renderMainChart(document.querySelector('.chart-icon-btn.active').dataset.chart);
+  if(document.getElementById('admin-dash').style.display==='block') renderAdminTable();
+  document.getElementById('mapSyncLabel').textContent = 'synced just now';
+  showToast('Live data synced');
+}
+function startAutoUpdate(interval){
+  clearInterval(updateTimer);
+  updateTimer = setInterval(simulateUpdate, interval);
+}
+document.getElementById('refreshInterval').addEventListener('change', (e)=>{
+  startAutoUpdate(parseInt(e.target.value));
+  showToast('Refresh interval updated');
+});
+
+/* keep "synced Xs ago" ticking + relative times fresh */
+setInterval(()=>{
+  const s = Math.floor((new Date() - (bins[0]?.updated||new Date()))/1000);
+}, 5000);
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+let toastTimer;
+function showToast(text){
+  const t = document.getElementById('toast');
+  document.getElementById('toastText').textContent = text;
+  t.classList.add('show');
+  clearInterval(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2600);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('load', ()=>{
+  initMap();
+  populateAreaSelects();
+  refreshStats();
+  renderMainChart('pie');
+  renderAnnualCharts();
+  renderReportList();
+  renderThemeSwatches();
+  startAutoUpdate(60000);
+  showToast('EcoTrack network connected');
+});
+</script>
+</body>
+</html>
